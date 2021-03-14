@@ -1,22 +1,29 @@
-.PHONY: default build image check publish-images
+.PHONY: builder local-image all-images
 
 TAG_NAME := $(shell git tag -l --contains HEAD)
+NAME := whoami
+IMAGE_NAME := parente/$(NAME)
 
-IMAGE_NAME := traefik/whoami
-
-default: check test build
+# Expose build platform args from the environment
+export GOOS?=
+export GOARCH?=
 
 build:
-	CGO_ENABLED=0 go build -a --trimpath --installsuffix cgo --ldflags="-s" -o whoami
+	CGO_ENABLED=0 go build -a --trimpath --installsuffix cgo --ldflags="-s" -o $(NAME)
 
-test:
-	go test -v -cover ./...
+builder:
+	docker buildx create \
+		--name $(NAME) \
+		--driver docker-container
 
-check:
-	golangci-lint run
+local-image:
+	DOCKER_BUILDKIT=1 docker buildx build \
+		--builder $(NAME) \
+		--load \
+		--tag $(NAME):latest .
 
-image:
-	docker build -t $(IMAGE_NAME) .
-
-publish-images:
-	seihon publish -v "$(TAG_NAME)" -v "latest" --image-name $(IMAGE_NAME) --dry-run=false
+push-images:
+	DOCKER_BUILDKIT=1 docker buildx build \
+		--builder $(NAME) \
+		--push \
+		--tag $(IMAGE_NAME):latest .

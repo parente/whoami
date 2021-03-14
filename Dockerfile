@@ -1,4 +1,5 @@
-FROM golang:1-alpine as builder
+# Let buildx specify the build platform image
+FROM --platform=$BUILDPLATFORM golang:alpine AS builder
 
 RUN apk --no-cache --no-progress add git ca-certificates tzdata make \
     && update-ca-certificates \
@@ -13,7 +14,12 @@ RUN GO111MODULE=on GOPROXY=https://proxy.golang.org go mod download
 
 COPY . .
 
-RUN make build
+# Let buildx specify the target platform
+ARG TARGETARCH
+ARG TARGETOS
+
+# Pass the target platform through to the go compiler/linker
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} make build
 
 # Create a minimal container to run a Golang static binary
 FROM scratch
